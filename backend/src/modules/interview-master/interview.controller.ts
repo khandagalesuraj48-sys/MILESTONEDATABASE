@@ -355,21 +355,39 @@ export async function extractResume(req: Request, res: Response) {
     } as ApiResponse);
   } catch (error: any) {
     console.error('[InterviewMaster] Extract resume error:', error.message || error);
-    const errMessage = (error.message || '').toLowerCase();
-    const isGeminiError =
-      errMessage.includes('gemini') ||
-      errMessage.includes('api_key') ||
-      errMessage.includes('quota') ||
-      errMessage.includes('generatecontent') ||
-      errMessage.includes('models/');
+    const rawMsg = (error.message || String(error)).toLowerCase();
 
-    return res.status(500).json({
+    let statusCode = 500;
+    let errorCode = 'GEMINI_EXTRACTION_ERROR';
+    let userMessage = 'Could not extract resume via AI. You can enter details manually.';
+
+    if (rawMsg.includes('gemini_api_key') || rawMsg.includes('api key not valid') || rawMsg.includes('api_key')) {
+      statusCode = 503;
+      errorCode = 'GEMINI_KEY_NOT_CONFIGURED';
+      userMessage = 'GEMINI_API_KEY is not configured or invalid on the server. Please enter details manually.';
+    } else if (rawMsg.includes('quota') || rawMsg.includes('resource_exhausted') || rawMsg.includes('429')) {
+      statusCode = 429;
+      errorCode = 'GEMINI_QUOTA_EXCEEDED';
+      userMessage = 'Gemini AI rate limit or quota exceeded. Please enter details manually or retry shortly.';
+    } else if (rawMsg.includes('timed out') || rawMsg.includes('timeout') || rawMsg.includes('deadline')) {
+      statusCode = 504;
+      errorCode = 'GEMINI_TIMEOUT';
+      userMessage = 'Gemini extraction timed out. Please enter candidate details manually.';
+    } else if (rawMsg.includes('no file') || rawMsg.includes('invalid pdf') || rawMsg.includes('corrupt')) {
+      statusCode = 400;
+      errorCode = 'INVALID_PDF_FILE';
+      userMessage = 'The selected file could not be parsed as a valid PDF.';
+    }
+
+    const sanitizedError = (error.message || String(error))
+      .replace(/[A-Za-z0-9_-]{20,}/g, (match: string) => (match.length > 25 ? '***' : match));
+
+    return res.status(statusCode).json({
       success: false,
       error: {
-        code: 'GEMINI_EXTRACTION_ERROR',
-        message: isGeminiError
-          ? 'Resume analysis could not be completed.'
-          : 'Failed to process resume file.',
+        code: errorCode,
+        message: userMessage,
+        diagnostic: sanitizedError,
       },
     } as ApiResponse);
   }

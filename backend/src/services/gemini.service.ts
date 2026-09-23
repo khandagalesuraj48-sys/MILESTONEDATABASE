@@ -160,7 +160,7 @@ RETURN ONLY VALID JSON matching this structure:
   let response: any;
   try {
     response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.0-flash',
       contents: [
         {
           role: 'user',
@@ -183,9 +183,9 @@ RETURN ONLY VALID JSON matching this structure:
       },
     });
   } catch (primaryModelErr: any) {
-    console.warn('[Gemini] gemini-2.5-flash failed, attempting fallback to gemini-2.0-flash:', primaryModelErr.message);
+    console.warn('[Gemini] gemini-2.0-flash failed, attempting fallback to gemini-1.5-flash:', primaryModelErr.message);
     response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-1.5-flash',
       contents: [
         {
           role: 'user',

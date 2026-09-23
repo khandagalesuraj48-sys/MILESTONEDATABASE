@@ -2,7 +2,14 @@
  * MILESTONE DATABASE — Frontend Application Logic
  */
 
-const API_BASE = '/api/v1';
+const STABLE_PRODUCTION_API = 'https://backend-psi-lyart-62.vercel.app/api/v1';
+
+// If running locally on localhost/127.0.0.1, use relative '/api/v1', otherwise target confirmed stable production backend
+const API_BASE =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? '/api/v1'
+    : STABLE_PRODUCTION_API;
 
 /**
  * Safe fetch helper that guarantees a structured JSON result,

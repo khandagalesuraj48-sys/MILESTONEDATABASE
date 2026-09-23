@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import multer from 'multer';
 import platformRouter from './modules/platform/platform.routes';
 import interviewRouter from './modules/interview-master/interview.routes';
 import { connectToDatabase } from './config/db';
@@ -36,7 +37,31 @@ app.use('/api/v1', interviewRouter);
 // Global Error Handler
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('[Platform Error]', err);
-  res.status(err.status || 500).json({
+
+  // Handle Multer upload errors
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: err.code || 'UPLOAD_ERROR',
+        message: err.message || 'File upload error',
+      },
+    });
+  }
+
+  // Handle fileFilter rejection (e.g. non-PDF)
+  if (err.message && err.message.includes('Only PDF files')) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'INVALID_FILE_TYPE',
+        message: err.message,
+      },
+    });
+  }
+
+  const statusCode = err.status || err.statusCode || 500;
+  res.status(statusCode).json({
     success: false,
     error: {
       code: err.code || 'INTERNAL_SERVER_ERROR',
