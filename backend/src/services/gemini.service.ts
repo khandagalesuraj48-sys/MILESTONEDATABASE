@@ -157,29 +157,57 @@ RETURN ONLY VALID JSON matching this structure:
 
   const base64Data = pdfBuffer.toString('base64');
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          {
-            inlineData: {
-              mimeType: 'application/pdf',
-              data: base64Data,
+  let response: any;
+  try {
+    response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              inlineData: {
+                mimeType: 'application/pdf',
+                data: base64Data,
+              },
             },
-          },
-          {
-            text: prompt,
-          },
-        ],
+            {
+              text: prompt,
+            },
+          ],
+        },
+      ],
+      config: {
+        temperature: 0.1,
+        responseMimeType: 'application/json',
       },
-    ],
-    config: {
-      temperature: 0.1,
-      responseMimeType: 'application/json',
-    },
-  });
+    });
+  } catch (primaryModelErr: any) {
+    console.warn('[Gemini] gemini-2.5-flash failed, attempting fallback to gemini-2.0-flash:', primaryModelErr.message);
+    response = await ai.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              inlineData: {
+                mimeType: 'application/pdf',
+                data: base64Data,
+              },
+            },
+            {
+              text: prompt,
+            },
+          ],
+        },
+      ],
+      config: {
+        temperature: 0.1,
+        responseMimeType: 'application/json',
+      },
+    });
+  }
 
   const rawText = (response.text || '').trim();
   if (!rawText) {

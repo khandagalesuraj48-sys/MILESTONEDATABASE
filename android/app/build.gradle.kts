@@ -21,15 +21,15 @@ android {
         applicationId = "com.interview.tracker"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField(
             "String",
             "API_BASE_URL",
-            "\"${localProperties["API_BASE_URL"] ?: "https://milestonedatabase.vercel.app/api/v1/"}\""
+            "\"${localProperties["API_BASE_URL"] ?: "https://backend-psi-lyart-62.vercel.app/api/v1/"}\""
         )
     }
 
@@ -47,7 +47,7 @@ android {
             buildConfigField(
                 "String",
                 "API_BASE_URL",
-                "\"${localProperties["API_BASE_URL"] ?: "https://milestonedatabase.vercel.app/api/v1/"}\""
+                "\"${localProperties["API_BASE_URL"] ?: "https://backend-psi-lyart-62.vercel.app/api/v1/"}\""
             )
         }
     }

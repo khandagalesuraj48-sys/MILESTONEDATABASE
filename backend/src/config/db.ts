@@ -17,38 +17,54 @@ dotenv.config();
 let cachedClient: MongoClient | null = null;
 let cachedDb: Db | null = null;
 let cachedBucket: GridFSBucket | null = null;
-
-const MONGODB_URI = process.env.MONGODB_URI || '';
-const DB_NAME = process.env.DB_NAME || 'milestone_database';
+let cachedPromise: Promise<{ client: MongoClient; db: Db }> | null = null;
 
 export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db }> {
+  const uri = process.env.MONGODB_URI;
+  const dbName = process.env.DB_NAME || 'milestone_database';
+
+  if (!uri) {
+    throw new Error(
+      'MONGODB_URI environment variable is not defined. Please set MONGODB_URI in your environment configuration.'
+    );
+  }
+
   if (cachedClient && cachedDb) {
     return { client: cachedClient, db: cachedDb };
   }
 
-  if (!MONGODB_URI) {
-    throw new Error(
-      'MONGODB_URI environment variable is not defined. Please set MONGODB_URI in your .env or environment configuration.'
-    );
+  if (!cachedPromise) {
+    const client = new MongoClient(uri, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      connectTimeoutMS: 10000,
+      maxIdleTimeMS: 30000,
+      retryWrites: true,
+      retryReads: true,
+    });
+
+    cachedPromise = client
+      .connect()
+      .then((connectedClient) => {
+        const db = connectedClient.db(dbName);
+        cachedClient = connectedClient;
+        cachedDb = db;
+        cachedBucket = new GridFSBucket(db, { bucketName: 'resumes' });
+        console.log(`[MongoDB] Connected to database: ${db.databaseName} on Cluster0`);
+        return { client: connectedClient, db };
+      })
+      .catch((err) => {
+        // Reset cache on connection failure so subsequent requests can retry
+        cachedPromise = null;
+        cachedClient = null;
+        cachedDb = null;
+        cachedBucket = null;
+        throw err;
+      });
   }
 
-  const client = new MongoClient(MONGODB_URI, {
-    maxPoolSize: 10,
-    minPoolSize: 1,
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 45000,
-  });
-
-  await client.connect();
-  const db = client.db(DB_NAME);
-
-  cachedClient = client;
-  cachedDb = db;
-  cachedBucket = new GridFSBucket(db, { bucketName: 'resumes' });
-
-  console.log(`[MongoDB] Connected to database: ${db.databaseName} on Cluster0`);
-
-  return { client, db };
+  return cachedPromise;
 }
 
 export async function getDb(): Promise<Db> {

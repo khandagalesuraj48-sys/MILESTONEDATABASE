@@ -1,7 +1,7 @@
 package com.interview.tracker.util
 
 object Constants {
-    const val DEFAULT_BASE_URL        = "https://milestonedatabase.vercel.app/api/v1/"
+    const val DEFAULT_BASE_URL        = "https://backend-psi-lyart-62.vercel.app/api/v1/"
     const val CONNECT_TIMEOUT_SECONDS = 60L
     const val READ_TIMEOUT_SECONDS    = 180L  // AI processing & large payloads
     const val WRITE_TIMEOUT_SECONDS   = 120L

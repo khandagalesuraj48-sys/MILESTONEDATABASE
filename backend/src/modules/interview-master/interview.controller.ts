@@ -58,11 +58,13 @@ export async function getDashboard(req: Request, res: Response) {
       candidatesCol.countDocuments({ interviewDate: today }),
       candidatesCol
         .aggregate<{ _id: string; count: number }>([
+          { $match: { interviewStatus: { $ne: null, $exists: true } } },
           { $group: { _id: '$interviewStatus', count: { $sum: 1 } } },
         ])
         .toArray(),
       candidatesCol
         .aggregate<{ _id: string; count: number }>([
+          { $match: { roleApplied: { $ne: null, $exists: true } } },
           { $group: { _id: '$roleApplied', count: { $sum: 1 } } },
         ])
         .toArray(),
@@ -74,21 +76,21 @@ export async function getDashboard(req: Request, res: Response) {
     ]);
 
     const byStatus: Record<string, number> = {};
-    for (const item of statusAggregation) {
-      if (item._id) byStatus[item._id] = item.count;
+    for (const item of statusAggregation || []) {
+      if (item && item._id) byStatus[String(item._id)] = item.count || 0;
     }
 
     const byRole: Record<string, number> = {};
-    for (const item of roleAggregation) {
-      if (item._id) byRole[item._id] = item.count;
+    for (const item of roleAggregation || []) {
+      if (item && item._id) byRole[String(item._id)] = item.count || 0;
     }
 
     const stats: DashboardStats = {
-      totalCandidates,
-      todayInterviews,
+      totalCandidates: totalCandidates || 0,
+      todayInterviews: todayInterviews || 0,
       byStatus,
       byRole,
-      recentCandidates,
+      recentCandidates: recentCandidates || [],
     };
 
     return res.json({
@@ -97,12 +99,23 @@ export async function getDashboard(req: Request, res: Response) {
       message: 'Dashboard data retrieved successfully',
     } as ApiResponse<DashboardStats>);
   } catch (error: any) {
-    console.error('[InterviewMaster] Dashboard error:', error);
-    return res.status(500).json({
+    console.error('[InterviewMaster] Dashboard error:', error.message || error);
+    const errMessage = (error.message || '').toLowerCase();
+    const isConnError =
+      errMessage.includes('ssl') ||
+      errMessage.includes('tls') ||
+      errMessage.includes('alert number 80') ||
+      errMessage.includes('serverselection') ||
+      errMessage.includes('timed out') ||
+      errMessage.includes('mongodb_uri');
+
+    return res.status(isConnError ? 503 : 500).json({
       success: false,
       error: {
-        code: 'DASHBOARD_ERROR',
-        message: error.message || 'Failed to fetch dashboard metrics',
+        code: isConnError ? 'MONGODB_CONNECTION_ERROR' : 'DASHBOARD_ERROR',
+        message: isConnError
+          ? 'Database connection is currently unavailable.'
+          : 'Failed to fetch dashboard metrics.',
       },
     } as ApiResponse);
   }
@@ -164,12 +177,23 @@ export async function getCandidates(req: Request, res: Response) {
       message: 'Candidates list retrieved successfully',
     } as ApiResponse);
   } catch (error: any) {
-    console.error('[InterviewMaster] Candidates error:', error);
-    return res.status(500).json({
+    console.error('[InterviewMaster] Candidates error:', error.message || error);
+    const errMessage = (error.message || '').toLowerCase();
+    const isConnError =
+      errMessage.includes('ssl') ||
+      errMessage.includes('tls') ||
+      errMessage.includes('alert number 80') ||
+      errMessage.includes('serverselection') ||
+      errMessage.includes('timed out') ||
+      errMessage.includes('mongodb_uri');
+
+    return res.status(isConnError ? 503 : 500).json({
       success: false,
       error: {
-        code: 'CANDIDATES_FETCH_ERROR',
-        message: error.message || 'Failed to fetch candidates',
+        code: isConnError ? 'MONGODB_CONNECTION_ERROR' : 'CANDIDATES_FETCH_ERROR',
+        message: isConnError
+          ? 'Database connection is currently unavailable.'
+          : 'Failed to fetch candidates.',
       },
     } as ApiResponse);
   }
@@ -207,12 +231,23 @@ export async function getCandidateById(req: Request, res: Response) {
       message: 'Candidate retrieved successfully',
     } as ApiResponse<CandidateDocument>);
   } catch (error: any) {
-    console.error('[InterviewMaster] Candidate detail error:', error);
-    return res.status(500).json({
+    console.error('[InterviewMaster] Candidate detail error:', error.message || error);
+    const errMessage = (error.message || '').toLowerCase();
+    const isConnError =
+      errMessage.includes('ssl') ||
+      errMessage.includes('tls') ||
+      errMessage.includes('alert number 80') ||
+      errMessage.includes('serverselection') ||
+      errMessage.includes('timed out') ||
+      errMessage.includes('mongodb_uri');
+
+    return res.status(isConnError ? 503 : 500).json({
       success: false,
       error: {
-        code: 'CANDIDATE_FETCH_ERROR',
-        message: error.message || 'Failed to fetch candidate details',
+        code: isConnError ? 'MONGODB_CONNECTION_ERROR' : 'CANDIDATE_FETCH_ERROR',
+        message: isConnError
+          ? 'Database connection is currently unavailable.'
+          : 'Failed to fetch candidate details.',
       },
     } as ApiResponse);
   }
@@ -272,19 +307,23 @@ export async function extractResume(req: Request, res: Response) {
 
     const extractedData = await extractResumeWithGemini(pdfBuffer, mimeType);
 
-    // Audit log
-    const auditLogs = await getAuditLogsCollection();
-    await auditLogs.insertOne({
-      entityType: 'document',
-      entityId: fileName,
-      action: 'extract',
-      details: {
-        fileSize,
-        fileName,
-      },
-      timestamp: new Date(),
-      ipAddress: req.ip,
-    });
+    // Audit log (non-blocking: extraction result must succeed even if telemetry write fails)
+    try {
+      const auditLogs = await getAuditLogsCollection();
+      await auditLogs.insertOne({
+        entityType: 'document',
+        entityId: fileName,
+        action: 'extract',
+        details: {
+          fileSize,
+          fileName,
+        },
+        timestamp: new Date(),
+        ipAddress: req.ip,
+      });
+    } catch (auditErr: any) {
+      console.warn('[InterviewMaster] Audit log write failed (non-blocking):', auditErr.message);
+    }
 
     const responsePayload = {
       ...extractedData,
@@ -315,12 +354,22 @@ export async function extractResume(req: Request, res: Response) {
       message: 'Resume extracted successfully via Gemini AI',
     } as ApiResponse);
   } catch (error: any) {
-    console.error('[InterviewMaster] Extract resume error:', error);
+    console.error('[InterviewMaster] Extract resume error:', error.message || error);
+    const errMessage = (error.message || '').toLowerCase();
+    const isGeminiError =
+      errMessage.includes('gemini') ||
+      errMessage.includes('api_key') ||
+      errMessage.includes('quota') ||
+      errMessage.includes('generatecontent') ||
+      errMessage.includes('models/');
+
     return res.status(500).json({
       success: false,
       error: {
-        code: 'RESUME_EXTRACTION_FAILED',
-        message: error.message || 'Failed to extract resume via Gemini',
+        code: 'GEMINI_EXTRACTION_ERROR',
+        message: isGeminiError
+          ? 'Resume analysis could not be completed.'
+          : 'Failed to process resume file.',
       },
     } as ApiResponse);
   }
@@ -509,16 +558,20 @@ export async function submitInterview(req: Request, res: Response) {
       updatedAt: now,
     });
 
-    // 5. Audit Log
-    const auditLogs = await getAuditLogsCollection();
-    await auditLogs.insertOne({
-      entityType: 'candidate',
-      entityId: interviewId,
-      action: 'create',
-      details: { name: newCandidate.name, role: newCandidate.roleApplied },
-      timestamp: now,
-      ipAddress: req.ip,
-    });
+    // 5. Audit Log (non-blocking)
+    try {
+      const auditLogs = await getAuditLogsCollection();
+      await auditLogs.insertOne({
+        entityType: 'candidate',
+        entityId: interviewId,
+        action: 'create',
+        details: { name: newCandidate.name, role: newCandidate.roleApplied },
+        timestamp: now,
+        ipAddress: req.ip,
+      });
+    } catch (auditErr: any) {
+      console.warn('[InterviewMaster] Candidate create audit log failed (non-blocking):', auditErr.message);
+    }
 
     const responseData = {
       ...newCandidate,
@@ -535,12 +588,23 @@ export async function submitInterview(req: Request, res: Response) {
       message: `Candidate saved successfully with Interview ID: ${interviewId}`,
     } as ApiResponse);
   } catch (error: any) {
-    console.error('[InterviewMaster] Submit error:', error);
-    return res.status(500).json({
+    console.error('[InterviewMaster] Submit error:', error.message || error);
+    const errMessage = (error.message || '').toLowerCase();
+    const isConnError =
+      errMessage.includes('ssl') ||
+      errMessage.includes('tls') ||
+      errMessage.includes('alert number 80') ||
+      errMessage.includes('serverselection') ||
+      errMessage.includes('timed out') ||
+      errMessage.includes('mongodb_uri');
+
+    return res.status(isConnError ? 503 : 500).json({
       success: false,
       error: {
-        code: 'SUBMISSION_FAILED',
-        message: error.message || 'Failed to submit candidate to MongoDB',
+        code: isConnError ? 'MONGODB_CONNECTION_ERROR' : 'SUBMISSION_FAILED',
+        message: isConnError
+          ? 'Database connection is currently unavailable. Please verify Atlas Network Access or retry.'
+          : 'Could not save candidate. Please retry.',
       },
     } as ApiResponse);
   }
@@ -653,15 +717,20 @@ export async function updateCandidate(req: Request, res: Response) {
 
     await candidatesCol.updateOne({ _id: existing._id }, { $set: updatedFields });
 
-    const auditLogs = await getAuditLogsCollection();
-    await auditLogs.insertOne({
-      entityType: 'candidate',
-      entityId: existing.interviewId,
-      action: 'update',
-      details: { changedFields: Object.keys(updatedFields) },
-      timestamp: new Date(),
-      ipAddress: req.ip,
-    });
+    // Audit Log (non-blocking)
+    try {
+      const auditLogs = await getAuditLogsCollection();
+      await auditLogs.insertOne({
+        entityType: 'candidate',
+        entityId: existing.interviewId,
+        action: 'update',
+        details: { changedFields: Object.keys(updatedFields) },
+        timestamp: new Date(),
+        ipAddress: req.ip,
+      });
+    } catch (auditErr: any) {
+      console.warn('[InterviewMaster] Candidate update audit log failed (non-blocking):', auditErr.message);
+    }
 
     return res.json({
       success: true,
@@ -669,12 +738,23 @@ export async function updateCandidate(req: Request, res: Response) {
       message: 'Candidate updated successfully',
     } as ApiResponse);
   } catch (error: any) {
-    console.error('[InterviewMaster] Update candidate error:', error);
-    return res.status(500).json({
+    console.error('[InterviewMaster] Update candidate error:', error.message || error);
+    const errMessage = (error.message || '').toLowerCase();
+    const isConnError =
+      errMessage.includes('ssl') ||
+      errMessage.includes('tls') ||
+      errMessage.includes('alert number 80') ||
+      errMessage.includes('serverselection') ||
+      errMessage.includes('timed out') ||
+      errMessage.includes('mongodb_uri');
+
+    return res.status(isConnError ? 503 : 500).json({
       success: false,
       error: {
-        code: 'UPDATE_FAILED',
-        message: error.message || 'Failed to update candidate record',
+        code: isConnError ? 'MONGODB_CONNECTION_ERROR' : 'UPDATE_FAILED',
+        message: isConnError
+          ? 'Database connection is currently unavailable.'
+          : 'Failed to update candidate record.',
       },
     } as ApiResponse);
   }
@@ -784,12 +864,23 @@ export async function getCandidateResume(req: Request, res: Response) {
 
     stream.pipe(res);
   } catch (error: any) {
-    console.error('[InterviewMaster] Candidate resume stream error:', error);
-    return res.status(500).json({
+    console.error('[InterviewMaster] Candidate resume stream error:', error.message || error);
+    const errMessage = (error.message || '').toLowerCase();
+    const isConnError =
+      errMessage.includes('ssl') ||
+      errMessage.includes('tls') ||
+      errMessage.includes('alert number 80') ||
+      errMessage.includes('serverselection') ||
+      errMessage.includes('timed out') ||
+      errMessage.includes('mongodb_uri');
+
+    return res.status(isConnError ? 503 : 500).json({
       success: false,
       error: {
-        code: 'RESUME_STREAM_ERROR',
-        message: error.message || 'Failed to stream candidate resume',
+        code: isConnError ? 'MONGODB_CONNECTION_ERROR' : 'RESUME_STREAM_ERROR',
+        message: isConnError
+          ? 'Database connection is currently unavailable.'
+          : 'Failed to stream candidate resume.',
       },
     } as ApiResponse);
   }

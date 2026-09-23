@@ -56,11 +56,22 @@ export async function healthCheck(req: Request, res: Response) {
       },
     } as ApiResponse);
   } catch (error: any) {
+    const rawMsg = (error.message || '').toLowerCase();
+    let safeMessage = 'Database connection is currently unavailable.';
+
+    if (rawMsg.includes('ssl') || rawMsg.includes('tls') || rawMsg.includes('alert number 80')) {
+      safeMessage = 'MongoDB Atlas rejected connection (TLS alert 80). Please ensure Atlas Network Access allows IP 0.0.0.0/0 for serverless hosting.';
+    } else if (rawMsg.includes('not defined') || rawMsg.includes('mongodb_uri')) {
+      safeMessage = 'MONGODB_URI environment variable is not configured on the server.';
+    } else if (rawMsg.includes('timed out') || rawMsg.includes('serverselection')) {
+      safeMessage = 'Database connection timed out. Cluster0 is currently unreachable.';
+    }
+
     return res.status(503).json({
       success: false,
       error: {
         code: 'HEALTH_CHECK_FAILED',
-        message: error.message || 'Database connection degraded or offline',
+        message: safeMessage,
       },
     } as ApiResponse);
   }
