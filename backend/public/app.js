@@ -4,6 +4,35 @@
 
 const API_BASE = '/api/v1';
 
+/**
+ * Safe fetch helper that guarantees a structured JSON result,
+ * preventing 'Unexpected token <' errors when server returns HTML/redirects.
+ */
+async function safeFetchJson(url, options = {}) {
+  try {
+    const res = await fetch(url, options);
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      return {
+        success: false,
+        error: {
+          code: 'SERVER_UNAVAILABLE',
+          message: 'Server is temporarily unavailable. Please try again.',
+        },
+      };
+    }
+    return await res.json();
+  } catch (err) {
+    return {
+      success: false,
+      error: {
+        code: 'NETWORK_ERROR',
+        message: 'Server is temporarily unavailable. Please try again.',
+      },
+    };
+  }
+}
+
 let platformModules = [];
 let dropdownsData = {};
 let selectedResumeFile = null;
@@ -85,8 +114,7 @@ function closeModuleDrawer() {
 
 async function loadModuleRegistry() {
   try {
-    const res = await fetch(`${API_BASE}/modules`);
-    const json = await res.json();
+    const json = await safeFetchJson(`${API_BASE}/modules`);
     if (json.success && Array.isArray(json.data)) {
       platformModules = json.data.filter((m) => m.status === 'active');
       renderDrawerModules(platformModules);
@@ -138,9 +166,8 @@ function getModuleIconSvg(iconName) {
 async function initHealthCheck() {
   const pill = document.getElementById('connectionPill');
   try {
-    const res = await fetch(`${API_BASE}/health`);
-    const json = await res.json();
-    if (json.success && json.data.database === 'connected') {
+    const json = await safeFetchJson(`${API_BASE}/health`);
+    if (json.success && json.data && json.data.database === 'connected') {
       pill.className = 'status-pill status-connected';
       pill.querySelector('.status-text').textContent = 'Cluster0 Connected';
     } else {
@@ -156,9 +183,8 @@ async function initHealthCheck() {
 // ==================== DROPDOWNS ====================
 async function loadDropdowns() {
   try {
-    const res = await fetch(`${API_BASE}/dropdowns`);
-    const json = await res.json();
-    if (json.success) {
+    const json = await safeFetchJson(`${API_BASE}/dropdowns`);
+    if (json.success && json.data) {
       dropdownsData = json.data;
       populateSelectOptions('roleAppliedSelect', dropdownsData.roles || []);
       populateSelectOptions('departmentSelect', dropdownsData.departments || []);
@@ -188,9 +214,8 @@ function populateSelectOptions(selectId, options, keepFirst = false, firstText =
 // ==================== DASHBOARD METRICS ====================
 async function initDashboardMetrics() {
   try {
-    const res = await fetch(`${API_BASE}/interviews/dashboard`);
-    const json = await res.json();
-    if (json.success) {
+    const json = await safeFetchJson(`${API_BASE}/interviews/dashboard`);
+    if (json.success && json.data) {
       const stats = json.data;
       const homeTotal = document.getElementById('homeTotalCandidates');
       const homeToday = document.getElementById('homeTodayInterviews');
@@ -207,14 +232,13 @@ async function initDashboardMetrics() {
 
 async function loadInterviewDashboard() {
   try {
-    const res = await fetch(`${API_BASE}/interviews/dashboard`);
-    const json = await res.json();
-    if (json.success) {
+    const json = await safeFetchJson(`${API_BASE}/interviews/dashboard`);
+    if (json.success && json.data) {
       const stats = json.data;
       document.getElementById('statTotalCandidates').textContent = stats.totalCandidates || 0;
       document.getElementById('statTodayInterviews').textContent = stats.todayInterviews || 0;
-      document.getElementById('statSelected').textContent = stats.byStatus['Selected'] || 0;
-      document.getElementById('statRejected').textContent = stats.byStatus['Rejected'] || 0;
+      document.getElementById('statSelected').textContent = stats.byStatus?.['Selected'] || 0;
+      document.getElementById('statRejected').textContent = stats.byStatus?.['Rejected'] || 0;
 
       const candidatesBadge = document.getElementById('candidatesTabBadge');
       if (candidatesBadge) candidatesBadge.textContent = stats.totalCandidates || 0;
@@ -222,6 +246,8 @@ async function loadInterviewDashboard() {
       renderStatusDistribution(stats.byStatus || {});
       renderRoleDistribution(stats.byRole || {});
       renderRecentCandidatesTable(stats.recentCandidates || []);
+    } else {
+      showToast(json.error?.message || 'Failed to load dashboard statistics', 'warning');
     }
   } catch (err) {
     showToast('Failed to load dashboard statistics', 'error');
@@ -380,11 +406,10 @@ async function triggerGeminiExtraction(file) {
   formData.append('resume', file);
 
   try {
-    const res = await fetch(`${API_BASE}/interviews/extract-resume`, {
+    const json = await safeFetchJson(`${API_BASE}/interviews/extract-resume`, {
       method: 'POST',
       body: formData,
     });
-    const json = await res.json();
 
     if (json.success && json.data) {
       applyExtractedDataToForm(json.data);
@@ -755,11 +780,10 @@ async function handleCandidateFormSubmit(e) {
       formData.append('resume', selectedResumeFile);
     }
 
-    const res = await fetch(`${API_BASE}/interviews/submit`, {
+    const json = await safeFetchJson(`${API_BASE}/interviews/submit`, {
       method: 'POST',
       body: formData,
     });
-    const json = await res.json();
 
     if (json.success && json.data) {
       const interviewId = json.data.interviewId;
@@ -818,8 +842,7 @@ async function loadCandidatesList() {
     if (status && status !== 'All') params.append('status', status);
     if (role && role !== 'All') params.append('role', role);
 
-    const res = await fetch(`${API_BASE}/candidates?${params.toString()}`);
-    const json = await res.json();
+    const json = await safeFetchJson(`${API_BASE}/candidates?${params.toString()}`);
 
     if (json.success && json.data) {
       renderCandidatesGrid(json.data.candidates || []);
@@ -912,8 +935,7 @@ function changeCandidatePage(delta) {
 // ==================== CANDIDATE DETAILS MODAL ====================
 async function openCandidateDetail(candidateId) {
   try {
-    const res = await fetch(`${API_BASE}/candidates/${candidateId}`);
-    const json = await res.json();
+    const json = await safeFetchJson(`${API_BASE}/candidates/${candidateId}`);
     if (!json.success || !json.data) {
       showToast('Could not load candidate details', 'error');
       return;
@@ -1062,8 +1084,7 @@ function closeCandidateDetailModal() {
 async function triggerCallCandidate(candidateId) {
   let c = activeCandidateDetail;
   if (!c || c.interviewId !== candidateId) {
-    const res = await fetch(`${API_BASE}/candidates/${candidateId}`);
-    const json = await res.json();
+    const json = await safeFetchJson(`${API_BASE}/candidates/${candidateId}`);
     if (json.success) c = json.data;
   }
   if (!c || !c.phones || c.phones.length === 0) {
@@ -1108,8 +1129,7 @@ function closeCallPickerModal() {
 async function triggerWhatsAppCandidate(candidateId) {
   let c = activeCandidateDetail;
   if (!c || c.interviewId !== candidateId) {
-    const res = await fetch(`${API_BASE}/candidates/${candidateId}`);
-    const json = await res.json();
+    const json = await safeFetchJson(`${API_BASE}/candidates/${candidateId}`);
     if (json.success) c = json.data;
   }
 

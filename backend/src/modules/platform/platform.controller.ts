@@ -65,13 +65,20 @@ export async function healthCheck(req: Request, res: Response) {
       safeMessage = 'MONGODB_URI environment variable is not configured on the server.';
     } else if (rawMsg.includes('timed out') || rawMsg.includes('serverselection')) {
       safeMessage = 'Database connection timed out. Cluster0 is currently unreachable.';
+    } else if (rawMsg.includes('bad auth') || rawMsg.includes('authentication failed')) {
+      safeMessage = 'MongoDB authentication failed. Please verify database user credentials in MONGODB_URI.';
     }
+
+    const sanitizedDetails = (error.message || String(error))
+      .replace(/mongodb(\+srv)?:\/\/[^\s]+/gi, 'mongodb+srv://***:***@cluster0.../')
+      .replace(/:([^@/]+)@/g, ':***@');
 
     return res.status(503).json({
       success: false,
       error: {
-        code: 'HEALTH_CHECK_FAILED',
+        code: error.name || 'HEALTH_CHECK_FAILED',
         message: safeMessage,
+        diagnostic: sanitizedDetails,
       },
     } as ApiResponse);
   }
