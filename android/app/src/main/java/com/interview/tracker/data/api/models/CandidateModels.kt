@@ -195,6 +195,7 @@ data class ExtractedCandidate(
     @SerializedName("phones") val phones: List<PhoneNumberDto>? = null,
     @SerializedName("emails") val emails: List<EmailAddressDto>? = null,
     @SerializedName("dob") val dob: String? = null,
+    @SerializedName("gender") val gender: String? = null,
     @SerializedName("currentAddress") val currentAddress: AddressDto? = null,
     @SerializedName("permanentAddress") val permanentAddress: AddressDto? = null,
     @SerializedName("education") val educationList: List<EducationDto>? = null,
@@ -207,8 +208,34 @@ data class ExtractedCandidate(
     @SerializedName("Current Location", alternate = ["currentLocation", "location"]) val currentLocation: String? = null,
     @SerializedName("Current Salary", alternate = ["currentSalary", "currentCtc"]) val currentSalary: String? = null,
     @SerializedName("Expected Salary", alternate = ["expectedSalary", "expectedCtc"]) val expectedSalary: String? = null,
-    @SerializedName("Notice Period", alternate = ["noticePeriod"]) val noticePeriod: String? = null
-)
+    @SerializedName("Notice Period", alternate = ["noticePeriod"]) val noticePeriod: String? = null,
+    @SerializedName("Joining Availability", alternate = ["joiningAvailability"]) val joiningAvailability: String? = null,
+    @SerializedName("Technical Knowledge (10)", alternate = ["technicalKnowledge"]) val technicalKnowledge: String? = null,
+    @SerializedName("Recommendation", alternate = ["recommendation"]) val recommendation: String? = null,
+    @SerializedName("Final Status", alternate = ["finalStatus", "status"]) val finalStatus: String? = null,
+    @SerializedName("Joining Date", alternate = ["joiningDate"]) val joiningDate: String? = null,
+    @SerializedName("Interviewer", alternate = ["interviewer"]) val interviewer: String? = null,
+    @SerializedName("Remarks", alternate = ["remarks", "summary"]) val remarks: String? = null
+) {
+    val effectiveMobile: String
+        get() = mobileNo?.ifBlank { null }
+            ?: phones?.firstOrNull()?.number
+            ?: ""
+
+    val effectiveEducation: String
+        get() = educationQualification?.ifBlank { null }
+            ?: educationList?.filter { it.qualification.isNotBlank() }?.joinToString(", ") {
+                listOf(it.qualification, it.course).filter { part -> part.isNotBlank() }.joinToString(" in ")
+            }
+            ?: ""
+
+    val effectiveLocation: String
+        get() = currentLocation?.ifBlank { null }
+            ?: listOfNotNull(currentAddress?.city, currentAddress?.state).filter { it.isNotBlank() }.joinToString(", ")
+
+    val effectiveTotalExperience: String
+        get() = totalExperienceYears ?: ""
+}
 
 data class SaveCandidateRequest(
     @SerializedName("action") val action: String = "saveCandidate",

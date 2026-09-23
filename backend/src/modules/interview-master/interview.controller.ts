@@ -219,11 +219,38 @@ export async function getCandidateById(req: Request, res: Response) {
 }
 
 /**
- * POST /api/v1/interviews/extract-resume
+ * POST /api/v1/interviews/extract-resume and POST /api/v1/resume/extract
  */
 export async function extractResume(req: Request, res: Response) {
   try {
-    if (!req.file) {
+    let pdfBuffer: Buffer | null = null;
+    let mimeType = 'application/pdf';
+    let fileName = 'resume.pdf';
+    let fileSize = 0;
+
+    // 1. Check multipart/form-data upload (Web client)
+    if (req.file) {
+      pdfBuffer = req.file.buffer;
+      mimeType = req.file.mimetype || 'application/pdf';
+      fileName = req.file.originalname || 'resume.pdf';
+      fileSize = req.file.size;
+    }
+    // 2. Check JSON payload upload (Android / Mobile client)
+    else if (req.body?.file?.base64) {
+      const base64Data = req.body.file.base64.replace(/^data:application\/pdf;base64,/, '');
+      pdfBuffer = Buffer.from(base64Data, 'base64');
+      mimeType = req.body.file.mimeType || 'application/pdf';
+      fileName = req.body.file.fileName || 'resume.pdf';
+      fileSize = pdfBuffer.length;
+    } else if (req.body?.base64) {
+      const base64Data = req.body.base64.replace(/^data:application\/pdf;base64,/, '');
+      pdfBuffer = Buffer.from(base64Data, 'base64');
+      mimeType = req.body.mimeType || 'application/pdf';
+      fileName = req.body.fileName || 'resume.pdf';
+      fileSize = pdfBuffer.length;
+    }
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
       return res.status(400).json({
         success: false,
         error: {
@@ -233,26 +260,58 @@ export async function extractResume(req: Request, res: Response) {
       } as ApiResponse);
     }
 
-    const pdfBuffer = req.file.buffer;
-    const extractedData = await extractResumeWithGemini(pdfBuffer, req.file.mimetype);
+    if (fileSize > 20 * 1024 * 1024) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'FILE_TOO_LARGE',
+          message: 'The selected PDF resume exceeds the maximum allowed 20MB limit.',
+        },
+      } as ApiResponse);
+    }
+
+    const extractedData = await extractResumeWithGemini(pdfBuffer, mimeType);
 
     // Audit log
     const auditLogs = await getAuditLogsCollection();
     await auditLogs.insertOne({
       entityType: 'document',
-      entityId: req.file.originalname,
+      entityId: fileName,
       action: 'extract',
       details: {
-        fileSize: req.file.size,
-        fileName: req.file.originalname,
+        fileSize,
+        fileName,
       },
       timestamp: new Date(),
       ipAddress: req.ip,
     });
 
+    const responsePayload = {
+      ...extractedData,
+      candidate: extractedData,
+      // Map flat legacy & Android field names
+      candidateName: extractedData.name,
+      mobileNo: extractedData.phones?.[0]?.number || '',
+      educationQualification: extractedData.education?.map((e) => [e.qualification, e.course].filter(Boolean).join(' in ')).join(', ') || '',
+      currentLocation: [extractedData.currentAddress?.city, extractedData.currentAddress?.state].filter(Boolean).join(', ') || '',
+      positionApplied: extractedData.roleApplied || '',
+      totalExperienceYears: String(extractedData.totalExperienceYears || '0'),
+      currentCompany: extractedData.currentCompany || '',
+      currentDesignation: extractedData.currentDesignation || '',
+      currentSalary: extractedData.currentCtc || '',
+      expectedSalary: extractedData.expectedCtc || '',
+      noticePeriod: extractedData.noticePeriod || '',
+      joiningAvailability: extractedData.joiningAvailability || '',
+      technicalKnowledge: extractedData.technicalKnowledge || '',
+      recommendation: extractedData.recommendation || '',
+      finalStatus: extractedData.status || 'Scheduled',
+      joiningDate: extractedData.joiningDate || '',
+      remarks: extractedData.summary || extractedData.remarks || '',
+    };
+
     return res.json({
       success: true,
-      data: extractedData,
+      data: responsePayload,
       message: 'Resume extracted successfully via Gemini AI',
     } as ApiResponse);
   } catch (error: any) {
@@ -268,11 +327,11 @@ export async function extractResume(req: Request, res: Response) {
 }
 
 /**
- * POST /api/v1/interviews/submit
+ * POST /api/v1/interviews/submit and POST /api/v1/submit
  */
 export async function submitInterview(req: Request, res: Response) {
   try {
-    const rawData = req.body;
+    const rawData = req.body || {};
     let candidateData: any = {};
 
     if (rawData.data && typeof rawData.data === 'string') {
@@ -281,11 +340,20 @@ export async function submitInterview(req: Request, res: Response) {
       } catch {
         candidateData = rawData;
       }
+    } else if (rawData.candidate && typeof rawData.candidate === 'object') {
+      candidateData = { ...rawData.candidate, remarks: rawData.remarks || rawData.candidate.remarks };
     } else {
       candidateData = rawData;
     }
 
-    if (!candidateData.name || !candidateData.name.trim()) {
+    const candidateName = (
+      candidateData.name ||
+      candidateData['Candidate Name'] ||
+      candidateData.candidateName ||
+      ''
+    ).trim();
+
+    if (!candidateName) {
       return res.status(400).json({
         success: false,
         error: {
@@ -295,16 +363,27 @@ export async function submitInterview(req: Request, res: Response) {
       } as ApiResponse);
     }
 
-    // 1. GridFS PDF upload if file present
+    // 1. GridFS PDF upload if file present (either multipart or JSON base64)
     let resumeDocumentId: ObjectId | undefined;
     let resumeFileName: string | undefined;
     let resumeFileSize: number | undefined;
 
     if (req.file) {
       const originalName = req.file.originalname || 'resume.pdf';
-      resumeDocumentId = await uploadResumeBuffer(req.file.buffer, originalName, req.file.mimetype);
+      resumeDocumentId = await uploadResumeBuffer(req.file.buffer, originalName, req.file.mimetype || 'application/pdf');
       resumeFileName = originalName;
       resumeFileSize = req.file.size;
+    } else {
+      const filePayload = rawData.file || candidateData.file;
+      if (filePayload && filePayload.base64) {
+        const base64Data = filePayload.base64.replace(/^data:application\/pdf;base64,/, '');
+        const pdfBuffer = Buffer.from(base64Data, 'base64');
+        const originalName = filePayload.fileName || 'resume.pdf';
+        const mimeType = filePayload.mimeType || 'application/pdf';
+        resumeDocumentId = await uploadResumeBuffer(pdfBuffer, originalName, mimeType);
+        resumeFileName = originalName;
+        resumeFileSize = pdfBuffer.length;
+      }
     }
 
     // 2. Generate Atomic Interview ID
@@ -312,8 +391,9 @@ export async function submitInterview(req: Request, res: Response) {
 
     // 3. Compute age if DOB is provided
     let age = candidateData.age;
-    if (candidateData.dob && !age) {
-      const birthDate = new Date(candidateData.dob);
+    const dob = candidateData.dob || candidateData['DOB'] || '';
+    if (dob && !age) {
+      const birthDate = new Date(dob);
       if (!isNaN(birthDate.getTime())) {
         const today = new Date();
         age = today.getFullYear() - birthDate.getFullYear();
@@ -325,56 +405,70 @@ export async function submitInterview(req: Request, res: Response) {
     }
 
     // 4. Normalize phones & emails
+    const primaryMobile = candidateData.mobile || candidateData['Mobile No.'] || candidateData.mobileNo || '';
     const phones = Array.isArray(candidateData.phones) && candidateData.phones.length > 0
       ? candidateData.phones
-      : [{ number: candidateData.mobile || '', type: 'primary', isPrimary: true }];
+      : [{ number: primaryMobile, type: 'primary', isPrimary: true }];
 
+    const primaryEmail = candidateData.email || candidateData['Email'] || candidateData.emailAddress || '';
     const emails = Array.isArray(candidateData.emails) && candidateData.emails.length > 0
       ? candidateData.emails
-      : [{ address: candidateData.email || '', type: 'primary', isPrimary: true }];
+      : [{ address: primaryEmail, type: 'primary', isPrimary: true }];
 
     // Compute distinct experience avoiding double counting concurrent intervals
-    let totalExperienceYears = Number(candidateData.totalExperienceYears);
+    let totalExperienceYears = Number(
+      candidateData.totalExperienceYears ||
+      candidateData['Total Experience (Years)'] ||
+      0
+    );
     if ((!totalExperienceYears || totalExperienceYears === 0) && Array.isArray(candidateData.experience) && candidateData.experience.length > 0) {
       totalExperienceYears = calculateDistinctExperienceYears(candidateData.experience);
     }
     if (isNaN(totalExperienceYears)) totalExperienceYears = 0;
 
     const now = new Date();
+    const currentLoc = candidateData['Current Location'] || '';
+    const currentAddress = candidateData.currentAddress || {
+      street: currentLoc,
+      city: candidateData.city || '',
+      state: candidateData.state || '',
+      pincode: candidateData.pincode || '',
+    };
+
     const newCandidate: CandidateDocument = {
       interviewId,
-      name: candidateData.name.trim(),
+      name: candidateName,
       phones,
       emails,
-      dob: candidateData.dob || '',
+      dob,
       age: age || undefined,
-      currentAddress: candidateData.currentAddress || { street: '', city: '', state: '', pincode: '' },
+      currentAddress,
       permanentAddress: candidateData.isPermanentSameAsCurrent
-        ? candidateData.currentAddress || { street: '', city: '', state: '', pincode: '' }
-        : candidateData.permanentAddress || { street: '', city: '', state: '', pincode: '' },
+        ? currentAddress
+        : (candidateData.permanentAddress || currentAddress),
       isPermanentSameAsCurrent: !!candidateData.isPermanentSameAsCurrent,
       education: Array.isArray(candidateData.education) ? candidateData.education : [],
       experience: Array.isArray(candidateData.experience) ? candidateData.experience : [],
       totalExperienceYears,
-      currentCompany: candidateData.currentCompany || '',
-      currentDesignation: candidateData.currentDesignation || '',
-      currentCtc: candidateData.currentCtc || '',
-      expectedCtc: candidateData.expectedCtc || '',
-      noticePeriod: candidateData.noticePeriod || '',
+      currentCompany: candidateData.currentCompany || candidateData['Current Company'] || '',
+      currentDesignation: candidateData.currentDesignation || candidateData['Current Designation'] || '',
+      currentCtc: candidateData.currentCtc || candidateData['Current Salary'] || '',
+      expectedCtc: candidateData.expectedCtc || candidateData['Expected Salary'] || '',
+      noticePeriod: candidateData.noticePeriod || candidateData['Notice Period'] || '',
       skills: Array.isArray(candidateData.skills)
         ? candidateData.skills
         : (candidateData.skills ? String(candidateData.skills).split(',').map((s: string) => s.trim()) : []),
-      roleApplied: candidateData.roleApplied || candidateData.role || 'Software Engineer',
-      department: candidateData.department || 'Engineering',
-      interviewDate: candidateData.interviewDate || getTodayKolkata(),
-      interviewTime: candidateData.interviewTime || '',
-      interviewMode: candidateData.interviewMode || 'In-Person',
-      interviewStatus: candidateData.interviewStatus || candidateData.status || 'Scheduled',
-      remarks: candidateData.remarks || '',
-      resumeDocumentId: resumeDocumentId ? resumeDocumentId.toString() : candidateData.resumeDocumentId,
-      resumeFileName: resumeFileName || candidateData.resumeFileName,
-      resumeFileSize: resumeFileSize || candidateData.resumeFileSize,
-      whatsappOptIn: !!candidateData.whatsappOptIn,
+      roleApplied: candidateData.roleApplied || candidateData['Position Applied For'] || candidateData.position || candidateData.role || 'Software Engineer',
+      department: candidateData.department || candidateData['Department'] || 'Engineering',
+      interviewDate: candidateData.interviewDate || candidateData['Interview Date'] || getTodayKolkata(),
+      interviewTime: candidateData.interviewTime || candidateData['Interview Time'] || '',
+      interviewMode: candidateData.interviewMode || candidateData['Interview Mode'] || 'In-Person',
+      interviewStatus: candidateData.interviewStatus || candidateData['Final Status'] || candidateData.status || 'Scheduled',
+      remarks: candidateData.remarks || candidateData['Remarks'] || rawData.remarks || '',
+      resumeDocumentId: resumeDocumentId ? resumeDocumentId.toString() : (candidateData.resumeDocumentId || undefined),
+      resumeFileName: resumeFileName || candidateData.resumeFileName || undefined,
+      resumeFileSize: resumeFileSize || candidateData.resumeFileSize || undefined,
+      whatsappOptIn: candidateData.whatsappOptIn !== undefined ? !!candidateData.whatsappOptIn : true,
       createdAt: now,
       updatedAt: now,
     };
@@ -384,12 +478,12 @@ export async function submitInterview(req: Request, res: Response) {
     newCandidate._id = insertResult.insertedId;
 
     // Record document metadata in documents collection for GridFS linkage
-    if (resumeDocumentId && req.file) {
+    if (resumeDocumentId) {
       const documentsCol = await getDocumentsCollection();
       await documentsCol.insertOne({
         resumeFileName: resumeFileName || 'resume.pdf',
-        mimeType: req.file.mimetype || 'application/pdf',
-        fileSize: req.file.size,
+        mimeType: 'application/pdf',
+        fileSize: resumeFileSize || 0,
         gridFsId: resumeDocumentId,
         entityType: 'candidate',
         entityId: interviewId,
@@ -426,11 +520,20 @@ export async function submitInterview(req: Request, res: Response) {
       ipAddress: req.ip,
     });
 
+    const responseData = {
+      ...newCandidate,
+      interviewId,
+      interviewDate: newCandidate.interviewDate,
+      resumeUrl: `/api/v1/candidates/${interviewId}/resume`,
+      resumeFileName: newCandidate.resumeFileName,
+      interviewIdRaw: interviewId, // For Android SaveCandidateResponse
+    };
+
     return res.status(201).json({
       success: true,
-      data: newCandidate,
+      data: responseData,
       message: `Candidate saved successfully with Interview ID: ${interviewId}`,
-    } as ApiResponse<CandidateDocument>);
+    } as ApiResponse);
   } catch (error: any) {
     console.error('[InterviewMaster] Submit error:', error);
     return res.status(500).json({
@@ -469,7 +572,7 @@ export async function updateCandidate(req: Request, res: Response) {
       } as ApiResponse);
     }
 
-    const rawData = req.body;
+    const rawData = req.body || {};
     let updateData: any = {};
     if (rawData.data && typeof rawData.data === 'string') {
       try {
@@ -477,6 +580,8 @@ export async function updateCandidate(req: Request, res: Response) {
       } catch {
         updateData = rawData;
       }
+    } else if (rawData.candidate && typeof rawData.candidate === 'object') {
+      updateData = rawData.candidate;
     } else {
       updateData = rawData;
     }
@@ -487,15 +592,25 @@ export async function updateCandidate(req: Request, res: Response) {
     let resumeFileSize = existing.resumeFileSize;
 
     if (req.file) {
-      // Remove old resume from GridFS if existed
       if (existing.resumeDocumentId) {
         await deleteResume(existing.resumeDocumentId);
       }
       const originalName = req.file.originalname || 'resume.pdf';
-      const newFileId = await uploadResumeBuffer(req.file.buffer, originalName, req.file.mimetype);
+      const newFileId = await uploadResumeBuffer(req.file.buffer, originalName, req.file.mimetype || 'application/pdf');
       resumeDocumentId = newFileId.toString();
       resumeFileName = originalName;
       resumeFileSize = req.file.size;
+    } else if (rawData.file && rawData.file.base64 && (rawData.replaceResume || updateData.replaceResume)) {
+      if (existing.resumeDocumentId) {
+        await deleteResume(existing.resumeDocumentId);
+      }
+      const base64Data = rawData.file.base64.replace(/^data:application\/pdf;base64,/, '');
+      const pdfBuffer = Buffer.from(base64Data, 'base64');
+      const originalName = rawData.file.fileName || 'resume.pdf';
+      const newFileId = await uploadResumeBuffer(pdfBuffer, originalName, 'application/pdf');
+      resumeDocumentId = newFileId.toString();
+      resumeFileName = originalName;
+      resumeFileSize = pdfBuffer.length;
     }
 
     const updatedFields: Partial<CandidateDocument> = {

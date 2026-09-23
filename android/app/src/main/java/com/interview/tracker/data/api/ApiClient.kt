@@ -29,23 +29,7 @@ object ApiClient {
             }
         }
 
-        // Interceptor to ensure Google Apps Script URLs do not have a trailing slash on /exec
-        // Google Apps Script returns HTTP 404 if /exec/ has a trailing slash.
-        val trailingSlashInterceptor = Interceptor { chain ->
-            val request = chain.request()
-            val url = request.url
-            val path = url.encodedPath
-            if (path.endsWith("/exec/")) {
-                val newPath = path.substring(0, path.length - 1)
-                val newUrl = url.newBuilder().encodedPath(newPath).build()
-                chain.proceed(request.newBuilder().url(newUrl).build())
-            } else {
-                chain.proceed(request)
-            }
-        }
-
         return OkHttpClient.Builder()
-            .addInterceptor(trailingSlashInterceptor)
             .addInterceptor(loggingInterceptor)
             .connectTimeout(Constants.CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .readTimeout(Constants.READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -59,13 +43,7 @@ object ApiClient {
     @Singleton
     fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
         val rawUrl = (BuildConfig.API_BASE_URL.ifEmpty { Constants.DEFAULT_BASE_URL }).trim()
-        val baseUrl = if (rawUrl.endsWith("/exec")) {
-            rawUrl.substringBeforeLast("/exec") + "/"
-        } else if (rawUrl.endsWith("/")) {
-            rawUrl
-        } else {
-            "$rawUrl/"
-        }
+        val baseUrl = if (rawUrl.endsWith("/")) rawUrl else "$rawUrl/"
 
         return Retrofit.Builder()
             .baseUrl(baseUrl)

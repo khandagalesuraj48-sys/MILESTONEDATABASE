@@ -21,7 +21,21 @@ import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 enum class ExtractionStage {
-    IDLE, READING_PDF, SENDING_AI, EXTRACTING, PREPARING_FORM, DONE, ERROR
+    IDLE,
+    SELECTING,
+    FILE_SELECTED,
+    UPLOADING,
+    ANALYZING,
+    EXTRACTION_COMPLETE,
+    ERROR
+}
+
+enum class SubmitStage {
+    IDLE,
+    SAVING,
+    MONGODB_CONFIRMED,
+    SUCCESS,
+    FAILED
 }
 
 data class NewInterviewUiState(
@@ -49,7 +63,7 @@ data class NewInterviewUiState(
     val joiningAvailability: String = "",
     val technicalKnowledge: String = "",
     val recommendation: String = "",
-    val finalStatus: String = "",
+    val finalStatus: String = "Scheduled",
     val joiningDate: String = "",
     val interviewer: String = "",
     val remarks: String = "",
@@ -60,9 +74,10 @@ data class NewInterviewUiState(
 
     // Submission
     val isSubmitting: Boolean = false,
+    val submitStage: SubmitStage = SubmitStage.IDLE,
     val submitError: String? = null,
     val submitSuccess: Boolean = false,
-    val submittedInterviewId: Int? = null,
+    val submittedInterviewId: String = "",
 
     // Form visibility
     val showForm: Boolean = false,
@@ -81,7 +96,6 @@ class NewInterviewViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(
         NewInterviewUiState(
-            // Instant 0ms dropdowns from cache if available!
             dropdowns = repository.getCachedDropdowns() ?: Dropdowns()
         )
     )
@@ -108,24 +122,14 @@ class NewInterviewViewModel @Inject constructor(
 
     fun onPdfSelected(context: Context, uri: Uri) {
         viewModelScope.launch {
-            // Stage 1: Reading PDF
+            // Stage: Reading file safely via Scoped Storage
             _uiState.update {
                 it.copy(
-                    extractionStage = ExtractionStage.READING_PDF,
+                    extractionStage = ExtractionStage.SELECTING,
                     pdfError = null,
                     extractionError = null,
                     showForm = false
                 )
-            }
-
-            if (!networkUtil.isConnected()) {
-                _uiState.update {
-                    it.copy(
-                        extractionStage = ExtractionStage.ERROR,
-                        extractionError = "No internet connection. Please check and try again."
-                    )
-                }
-                return@launch
             }
 
             val fileResult = withContext(Dispatchers.IO) {
@@ -154,35 +158,54 @@ class NewInterviewViewModel @Inject constructor(
                     selectedPdfUri = uri,
                     selectedPdfName = fileName,
                     selectedPdfSize = fileSize,
-                    cachedFilePayload = filePayload
+                    cachedFilePayload = filePayload,
+                    extractionStage = ExtractionStage.FILE_SELECTED
                 )
             }
 
-            // Stage 2: Sending to AI
-            _uiState.update { it.copy(extractionStage = ExtractionStage.SENDING_AI) }
+            if (!networkUtil.isConnected()) {
+                _uiState.update {
+                    it.copy(
+                        extractionStage = ExtractionStage.ERROR,
+                        extractionError = "No internet connection. Please check your network and retry.",
+                        showForm = true
+                    )
+                }
+                return@launch
+            }
 
-            // Stage 3: Extracting via Gemini on server
-            _uiState.update { it.copy(extractionStage = ExtractionStage.EXTRACTING) }
+            // Stage: Uploading to Vercel API
+            _uiState.update { it.copy(extractionStage = ExtractionStage.UPLOADING) }
+
+            // Stage: Analyzing with Gemini AI
+            _uiState.update { it.copy(extractionStage = ExtractionStage.ANALYZING) }
 
             repository.processResume(filePayload)
                 .onSuccess { extracted ->
-                    // Stage 4: Preparing form
-                    _uiState.update { it.copy(extractionStage = ExtractionStage.PREPARING_FORM) }
+                    // Stage: Preparing form
+                    _uiState.update { it.copy(extractionStage = ExtractionStage.EXTRACTION_COMPLETE) }
 
                     _uiState.update { state ->
                         state.copy(
-                            extractionStage = ExtractionStage.DONE,
+                            extractionStage = ExtractionStage.IDLE,
                             showForm = true,
                             candidateName = extracted.candidateName.orEmpty(),
-                            mobileNo = extracted.mobileNo.orEmpty(),
+                            mobileNo = extracted.effectiveMobile,
                             positionApplied = extracted.positionApplied.orEmpty().ifEmpty { state.positionApplied },
                             department = extracted.department.orEmpty().ifEmpty { state.department },
-                            education = extracted.educationQualification.orEmpty(),
-                            totalExperience = extracted.totalExperienceYears.orEmpty(),
-                            currentLocation = extracted.currentLocation.orEmpty(),
+                            education = extracted.effectiveEducation,
+                            totalExperience = extracted.effectiveTotalExperience,
+                            currentLocation = extracted.effectiveLocation,
                             currentSalary = extracted.currentSalary.orEmpty(),
                             expectedSalary = extracted.expectedSalary.orEmpty(),
-                            noticePeriod = extracted.noticePeriod.orEmpty()
+                            noticePeriod = extracted.noticePeriod.orEmpty(),
+                            joiningAvailability = extracted.joiningAvailability.orEmpty(),
+                            technicalKnowledge = extracted.technicalKnowledge.orEmpty(),
+                            recommendation = extracted.recommendation.orEmpty(),
+                            finalStatus = extracted.finalStatus.orEmpty().ifEmpty { "Scheduled" },
+                            joiningDate = extracted.joiningDate.orEmpty(),
+                            interviewer = extracted.interviewer.orEmpty(),
+                            remarks = extracted.remarks.orEmpty()
                         )
                     }
                 }
@@ -191,7 +214,7 @@ class NewInterviewViewModel @Inject constructor(
                         it.copy(
                             extractionStage = ExtractionStage.ERROR,
                             extractionError = (error as? Exception)?.toUserMessage()
-                                ?: "AI extraction failed. You can still fill details manually.",
+                                ?: "AI extraction encountered an issue. You can complete candidate details manually.",
                             showForm = true
                         )
                     }
@@ -199,7 +222,7 @@ class NewInterviewViewModel @Inject constructor(
         }
     }
 
-    // Form field updates
+    // Form field updates (User can edit EVERY field freely)
     fun onCandidateNameChange(v: String) = _uiState.update { it.copy(candidateName = v) }
     fun onMobileNoChange(v: String) = _uiState.update { it.copy(mobileNo = v) }
     fun onPositionAppliedChange(v: String) = _uiState.update { it.copy(positionApplied = v) }
@@ -239,13 +262,20 @@ class NewInterviewViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isSubmitting = true, submitError = null) }
+            _uiState.update {
+                it.copy(
+                    isSubmitting = true,
+                    submitStage = SubmitStage.SAVING,
+                    submitError = null
+                )
+            }
 
             if (!networkUtil.isConnected()) {
                 isSubmittingGuard.set(false)
                 _uiState.update {
                     it.copy(
                         isSubmitting = false,
+                        submitStage = SubmitStage.FAILED,
                         submitError = "No internet connection. Please check and try again."
                     )
                 }
@@ -274,13 +304,16 @@ class NewInterviewViewModel @Inject constructor(
 
             repository.saveCandidate(filePayload, candidate, state.remarks)
                 .onSuccess { response ->
-                    // SERVER CONFIRMED: Real confirmed interview ID from backend
                     isSubmittingGuard.set(false)
+                    val confirmedId = response.interviewIdString.ifBlank {
+                        if (response.interviewId > 0) response.interviewId.toString() else "SAVED"
+                    }
                     _uiState.update {
                         it.copy(
                             isSubmitting = false,
+                            submitStage = SubmitStage.SUCCESS,
                             submitSuccess = true,
-                            submittedInterviewId = response.interviewId
+                            submittedInterviewId = confirmedId
                         )
                     }
                 }
@@ -289,8 +322,9 @@ class NewInterviewViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isSubmitting = false,
+                            submitStage = SubmitStage.FAILED,
                             submitError = (error as? Exception)?.toUserMessage()
-                                ?: "Failed to submit interview. Please retry."
+                                ?: "Failed to save candidate to MongoDB. Please retry."
                         )
                     }
                 }

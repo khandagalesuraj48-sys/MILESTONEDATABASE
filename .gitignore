@@ -18,6 +18,8 @@ yarn-error.log*
 # Android / Gradle
 .gradle/
 android/.gradle/
+android/.kotlin/
+**/.kotlin/
 android/app/build/
 android/build/
 local.properties

@@ -85,6 +85,7 @@ fun NewInterviewScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -134,10 +135,10 @@ fun NewInterviewScreen(
                         onClick = { pdfPickerLauncher.launch("application/pdf") },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = uiState.extractionStage !in listOf(
-                            ExtractionStage.READING_PDF,
-                            ExtractionStage.SENDING_AI,
-                            ExtractionStage.EXTRACTING,
-                            ExtractionStage.PREPARING_FORM
+                            ExtractionStage.SELECTING,
+                            ExtractionStage.UPLOADING,
+                            ExtractionStage.ANALYZING,
+                            ExtractionStage.EXTRACTION_COMPLETE
                         ) && !uiState.isSubmitting
                     ) {
                         Icon(Icons.Filled.AttachFile, contentDescription = null)
@@ -162,10 +163,11 @@ fun NewInterviewScreen(
 
             // ---- AI EXTRACTION STAGES ----
             when (uiState.extractionStage) {
-                ExtractionStage.READING_PDF,
-                ExtractionStage.SENDING_AI,
-                ExtractionStage.EXTRACTING,
-                ExtractionStage.PREPARING_FORM -> {
+                ExtractionStage.SELECTING,
+                ExtractionStage.FILE_SELECTED,
+                ExtractionStage.UPLOADING,
+                ExtractionStage.ANALYZING,
+                ExtractionStage.EXTRACTION_COMPLETE -> {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
@@ -186,11 +188,12 @@ fun NewInterviewScreen(
                             )
                             Text(
                                 text = when (uiState.extractionStage) {
-                                    ExtractionStage.READING_PDF     -> "Reading PDF…"
-                                    ExtractionStage.SENDING_AI      -> "Sending to AI…"
-                                    ExtractionStage.EXTRACTING      -> "Extracting candidate details…"
-                                    ExtractionStage.PREPARING_FORM  -> "Preparing form…"
-                                    else                            -> ""
+                                    ExtractionStage.SELECTING           -> "Reading PDF resume…"
+                                    ExtractionStage.FILE_SELECTED       -> "PDF selected. Connecting…"
+                                    ExtractionStage.UPLOADING           -> "Uploading resume…"
+                                    ExtractionStage.ANALYZING           -> "Analyzing resume with Gemini AI…"
+                                    ExtractionStage.EXTRACTION_COMPLETE -> "Preparing candidate details…"
+                                    else                                -> ""
                                 },
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -383,7 +386,7 @@ fun NewInterviewScreen(
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Submitting…")
+                        Text("Saving to MongoDB & GridFS…")
                     } else {
                         Text("Submit Interview")
                     }

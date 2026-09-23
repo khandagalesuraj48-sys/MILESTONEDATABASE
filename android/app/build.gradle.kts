@@ -29,7 +29,7 @@ android {
         buildConfigField(
             "String",
             "API_BASE_URL",
-            "\"${localProperties["API_BASE_URL"] ?: "https://script.google.com/macros/s/AKfycbw-S1z_Hb_ghoCE23fU-EsjcWbK63aSjAZLvfRO-elzHuc56dpqqp42vl-qO3T8cdCK/exec"}\""
+            "\"${localProperties["API_BASE_URL"] ?: "https://milestonedatabase.vercel.app/api/v1/"}\""
         )
     }
 
@@ -47,7 +47,7 @@ android {
             buildConfigField(
                 "String",
                 "API_BASE_URL",
-                "\"${localProperties["API_BASE_URL"] ?: "https://script.google.com/macros/s/AKfycbw-S1z_Hb_ghoCE23fU-EsjcWbK63aSjAZLvfRO-elzHuc56dpqqp42vl-qO3T8cdCK/exec"}\""
+                "\"${localProperties["API_BASE_URL"] ?: "https://milestonedatabase.vercel.app/api/v1/"}\""
             )
         }
     }

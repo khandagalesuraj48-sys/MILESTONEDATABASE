@@ -171,23 +171,7 @@ class CandidateRepository @Inject constructor(
     }
 
     private fun getDefaultModules(): List<PlatformModule> = listOf(
-        PlatformModule("interview-master", "INTERVIEW MASTER", "user-check", "Candidate screening, Gemini resume parsing, and hiring lifecycle.", "/modules/interview-master", "active", 1, "hr", "1.0.0"),
-        PlatformModule("employee-master", "EMPLOYEE MASTER", "users", "Staff directory, designations, and departmental allocations.", "/modules/employee-master", "coming_soon", 2, "hr", "1.0.0"),
-        PlatformModule("offer-letter", "OFFER LETTER", "file-text", "Automated offer letter generation and tracking.", "/modules/offer-letter", "coming_soon", 3, "hr", "1.0.0"),
-        PlatformModule("attendance", "ATTENDANCE", "calendar", "Daily clock-in/out records, leaves, and biometric tracking.", "/modules/attendance", "coming_soon", 4, "hr", "1.0.0"),
-        PlatformModule("payroll", "PAYROLL", "dollar-sign", "Monthly payroll processing and statutory deductions.", "/modules/payroll", "coming_soon", 5, "finance", "1.0.0"),
-        PlatformModule("document-management", "DOCUMENT MANAGEMENT", "folder", "Centralized repository for corporate contracts and compliance files.", "/modules/document-management", "coming_soon", 6, "admin", "1.0.0"),
-        PlatformModule("reports", "REPORTS & ANALYTICS", "bar-chart-2", "Cross-module executive business intelligence.", "/modules/reports", "coming_soon", 7, "admin", "1.0.0"),
-        PlatformModule("expense-management", "EXPENSE MANAGEMENT", "credit-card", "Staff expense claims and reimbursements.", "/modules/expense-management", "coming_soon", 8, "finance", "1.0.0"),
-        PlatformModule("asset-management", "ASSET MANAGEMENT", "laptop", "Tracking IT hardware and office equipment.", "/modules/asset-management", "coming_soon", 9, "operations", "1.0.0"),
-        PlatformModule("vehicle-management", "VEHICLE MANAGEMENT", "truck", "Fleet tracking and driver assignments.", "/modules/vehicle-management", "coming_soon", 10, "operations", "1.0.0"),
-        PlatformModule("machinery-management", "MACHINERY MANAGEMENT", "cpu", "Machinery uptime and servicing logs.", "/modules/machinery-management", "coming_soon", 11, "operations", "1.0.0"),
-        PlatformModule("vendor-master", "VENDOR MASTER", "briefcase", "Supplier directory, contracts, and payment terms.", "/modules/vendor-master", "coming_soon", 12, "operations", "1.0.0"),
-        PlatformModule("project-management", "PROJECT MANAGEMENT", "layers", "Milestone tracking and budget oversight.", "/modules/project-management", "coming_soon", 13, "operations", "1.0.0"),
-        PlatformModule("task-management", "TASK MANAGEMENT", "check-square", "Delegated tasks and deadline reminders.", "/modules/task-management", "coming_soon", 14, "operations", "1.0.0"),
-        PlatformModule("purchase", "PURCHASE", "shopping-cart", "Purchase requisitions and PO generation.", "/modules/purchase", "coming_soon", 15, "operations", "1.0.0"),
-        PlatformModule("inventory", "INVENTORY", "package", "Stock levels and material dispatch records.", "/modules/inventory", "coming_soon", 16, "operations", "1.0.0"),
-        PlatformModule("compliance", "COMPLIANCE", "shield", "Regulatory compliance and document expiry alerts.", "/modules/compliance", "coming_soon", 17, "admin", "1.0.0")
+        PlatformModule("interview-master", "INTERVIEW MASTER", "user-check", "Candidate screening, Gemini resume parsing, and hiring lifecycle.", "/modules/interview-master", "active", 1, "hr", "1.0.0")
     )
 
     suspend fun getDashboard(): Result<Dashboard> = withContext(Dispatchers.IO) {
