@@ -1,5 +1,6 @@
 package com.interview.tracker.data.api.models
 
+import com.google.gson.JsonElement
 import com.google.gson.annotations.SerializedName
 
 /**
@@ -8,8 +9,17 @@ import com.google.gson.annotations.SerializedName
 data class ApiResponse<T>(
     @SerializedName("success") val success: Boolean,
     @SerializedName("data") val data: T? = null,
-    @SerializedName("error") val error: String? = null
-)
+    @SerializedName("error") val error: JsonElement? = null,
+    @SerializedName("message") val message: String? = null
+) {
+    val errorMessage: String?
+        get() = when {
+            error == null || error.isJsonNull -> message
+            error.isJsonPrimitive -> error.asString
+            error.isJsonObject && error.asJsonObject.has("message") -> error.asJsonObject.get("message").asString
+            else -> error.toString()
+        }
+}
 
 data class BootstrapData(
     @SerializedName("version") val version: String,

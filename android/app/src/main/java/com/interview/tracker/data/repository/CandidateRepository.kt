@@ -178,7 +178,7 @@ class CandidateRepository @Inject constructor(
         runCatching {
             PerfLogger.measureSuspend("API_Dashboard") {
                 val response = apiService.getDashboard()
-                if (!response.success) throw Exception(response.error ?: "Failed to load dashboard")
+                if (!response.success) throw Exception(response.errorMessage ?: "Failed to load dashboard")
                 val data = response.data ?: throw Exception("No dashboard data received")
                 val domainDashboard = Dashboard(
                     total = data.total,
@@ -224,7 +224,7 @@ class CandidateRepository @Inject constructor(
         runCatching {
             PerfLogger.measureSuspend("API_Dropdowns") {
                 val response = apiService.getDropdowns()
-                if (!response.success) throw Exception(response.error ?: "Failed to load dropdowns")
+                if (!response.success) throw Exception(response.errorMessage ?: "Failed to load dropdowns")
                 val data = response.data ?: throw Exception("No dropdown data received")
                 val dropdowns = Dropdowns(
                     joiningAvailability = data.joiningAvailability,
@@ -243,7 +243,7 @@ class CandidateRepository @Inject constructor(
         runCatching {
             PerfLogger.measureSuspend("API_Resume_Gemini_Extraction") {
                 val response = apiService.processResume(ProcessResumeRequest(file = file))
-                if (!response.success) throw Exception(response.error ?: "AI processing failed")
+                if (!response.success) throw Exception(response.errorMessage ?: "AI processing failed")
                 response.data?.candidate ?: throw Exception("No extraction result received")
             }
         }
@@ -263,7 +263,7 @@ class CandidateRepository @Inject constructor(
                         remarks = remarks
                     )
                 )
-                if (!response.success) throw Exception(response.error ?: "Failed to save candidate to MongoDB")
+                if (!response.success) throw Exception(response.errorMessage ?: "Failed to save candidate to MongoDB")
                 val data = response.data ?: throw Exception("No response data after saving candidate")
                 
                 // Add to local cache
@@ -298,7 +298,7 @@ class CandidateRepository @Inject constructor(
                         file = file
                     )
                 )
-                if (!response.success) throw Exception(response.error ?: "Failed to update candidate")
+                if (!response.success) throw Exception(response.errorMessage ?: "Failed to update candidate")
                 val data = response.data ?: throw Exception("No response data after update")
                 cache.updateCandidate(candidate)
                 data
@@ -309,7 +309,7 @@ class CandidateRepository @Inject constructor(
     suspend fun getWhatsApp(id: Int): Result<WhatsAppData> = withContext(Dispatchers.IO) {
         runCatching {
             val response = apiService.getWhatsApp(id = id.toString())
-            if (!response.success) throw Exception(response.error ?: "Failed to load WhatsApp data")
+            if (!response.success) throw Exception(response.errorMessage ?: "Failed to load WhatsApp data")
             response.data ?: throw Exception("No WhatsApp data received")
         }
     }
