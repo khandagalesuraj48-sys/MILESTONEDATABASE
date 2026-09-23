@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="InterviewTracker.Views.EditCandidatePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:conv="using:InterviewTracker.Converters"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Page.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+    </Page.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="24,16,24,32" MaxWidth="1100" HorizontalAlignment="Left">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Grid Grid.Row="0" Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="← Back" Click="BackButton_Click" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBlock Text="Edit Candidate" Style="{ThemeResource TitleLargeTextBlockStyle}" />
+                    </StackPanel>
+                    <TextBlock
+                        Text="{x:Bind ViewModel.InterviewId, Mode=OneWay}"
+                        Style="{ThemeResource CaptionTextBlockStyle}"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Margin="64,4,0,0" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button Content="Cancel" Click="BackButton_Click" />
+                    <Button
+                        Content="💾  Save Changes"
+                        Style="{StaticResource AccentButtonStyle}"
+                        Click="SaveButton_Click"
+                        IsEnabled="{x:Bind ViewModel.IsSaving, Mode=OneWay, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Status InfoBars -->
+            <StackPanel Grid.Row="1" Spacing="8" Margin="0,0,0,12">
+                <ProgressRing
+                    IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                    Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource BoolToVisibility}}"
+                    HorizontalAlignment="Center"
+                    Width="40" Height="40" Margin="0,8" />
+
+                <InfoBar
+                    IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
+                    Severity="Error"
+                    Title="Error"
+                    Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}" />
+
+                <InfoBar
+                    IsOpen="{x:Bind ViewModel.HasSuccess, Mode=OneWay}"
+                    Severity="Success"
+                    Title="Success"
+                    Message="{x:Bind ViewModel.SuccessMessage, Mode=OneWay}" />
+            </StackPanel>
+
+            <!-- Form Content -->
+            <StackPanel Grid.Row="2" Spacing="16">
+                <!-- Candidate Details Card -->
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel Spacing="16">
+                        <TextBlock Text="Candidate Information" Style="{StaticResource SectionHeaderStyle}" />
+
+                        <Grid ColumnSpacing="16" RowSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBox
+                                Grid.Row="0" Grid.Column="0"
+                                Header="Candidate Name *"
+                                Text="{x:Bind ViewModel.CandidateName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBox
+                                Grid.Row="0" Grid.Column="1"
+                                Header="Mobile No. *"
+                                Text="{x:Bind ViewModel.MobileNo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBox
+                                Grid.Row="1" Grid.Column="0"
+                                Header="Position Applied For *"
+                                Text="{x:Bind ViewModel.PositionAppliedFor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBox
+                                Grid.Row="1" Grid.Column="1"
+                                Header="Department"
+                                Text="{x:Bind ViewModel.Department, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBox
+                                Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                                Header="Education / Qualification"
+                                Text="{x:Bind ViewModel.EducationQualification, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBox
+                                Grid.Row="3" Grid.Column="0"
+                                Header="Total Experience (Years)"
+                                Text="{x:Bind ViewModel.TotalExperienceYears, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBox
+                                Grid.Row="3" Grid.Column="1"
+                                Header="Current Location"
+                                Text="{x:Bind ViewModel.CurrentLocation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Financial & Joining Details Card -->
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel Spacing="16">
+                        <TextBlock Text="Financial &amp; Availability Details" Style="{StaticResource SectionHeaderStyle}" />
+
+                        <Grid ColumnSpacing="16" RowSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBox
+                                Grid.Row="0" Grid.Column="0"
+                                Header="Current Salary"
+                                Text="{x:Bind ViewModel.CurrentSalary, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBox
+                                Grid.Row="0" Grid.Column="1"
+                                Header="Expected Salary"
+                                Text="{x:Bind ViewModel.ExpectedSalary, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBox
+                                Grid.Row="1" Grid.Column="0"
+                                Header="Notice Period"
+                                Text="{x:Bind ViewModel.NoticePeriod, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <ComboBox
+                                x:Name="JoiningAvailCombo"
+                                Grid.Row="1" Grid.Column="1"
+                                Header="Joining Availability"
+                                HorizontalAlignment="Stretch"
+                                ItemsSource="{x:Bind ViewModel.JoiningAvailabilityOptions, Mode=OneWay}"
+                                SelectedItem="{x:Bind ViewModel.JoiningAvailability, Mode=TwoWay}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Evaluation & Status Card -->
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel Spacing="16">
+                        <TextBlock Text="Evaluation &amp; Decision" Style="{StaticResource SectionHeaderStyle}" />
+
+                        <Grid ColumnSpacing="16" RowSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBox
+                                Grid.Row="0" Grid.Column="0"
+                                Header="Technical Knowledge (10)"
+                                Text="{x:Bind ViewModel.TechnicalKnowledge, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <ComboBox
+                                x:Name="RecommendCombo"
+                                Grid.Row="0" Grid.Column="1"
+                                Header="Recommendation"
+                                HorizontalAlignment="Stretch"
+                                ItemsSource="{x:Bind ViewModel.RecommendationOptions, Mode=OneWay}"
+                                SelectedItem="{x:Bind ViewModel.Recommendation, Mode=TwoWay}" />
+
+                            <ComboBox
+                                x:Name="FinalStatusCombo"
+                                Grid.Row="1" Grid.Column="0"
+                                Header="Final Status"
+                                HorizontalAlignment="Stretch"
+                                ItemsSource="{x:Bind ViewModel.FinalStatusOptions, Mode=OneWay}"
+                                SelectedItem="{x:Bind ViewModel.FinalStatus, Mode=TwoWay}" />
+
+                            <TextBox
+                                Grid.Row="1" Grid.Column="1"
+                                Header="Joining Date (YYYY-MM-DD)"
+                                Text="{x:Bind ViewModel.JoiningDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBox
+                                Grid.Row="2" Grid.Column="0"
+                                Header="Interviewer"
+                                Text="{x:Bind ViewModel.Interviewer, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBox
+                                Grid.Row="2" Grid.Column="1"
+                                Header="Remarks"
+                                Text="{x:Bind ViewModel.Remarks, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Resume Replacement Card -->
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Resume Management" Style="{StaticResource SectionHeaderStyle}" />
+
+                        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                            <TextBlock Text="Current Resume:" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                            <HyperlinkButton
+                                Content="📄 Open Current Resume ↗"
+                                NavigateUri="{x:Bind ViewModel.ExistingResumeUrl, Mode=OneWay}" />
+                        </StackPanel>
+
+                        <CheckBox
+                            Content="Replace resume with new PDF"
+                            IsChecked="{x:Bind ViewModel.ReplaceResume, Mode=TwoWay}"
+                            Margin="0,4,0,0" />
+
+                        <StackPanel
+                            Visibility="{x:Bind ViewModel.ReplaceResume, Mode=OneWay, Converter={StaticResource BoolToVisibility}}"
+                            Spacing="8"
+                            Margin="24,0,0,0">
+                            <Button
+                                Content="📎  Select New PDF Resume"
+                                Click="PickPdfButton_Click" />
+
+                            <StackPanel
+                                Orientation="Horizontal"
+                                Spacing="8"
+                                Visibility="{x:Bind ViewModel.HasNewFile, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="✓" Foreground="{StaticResource SuccessBrush}" FontWeight="Bold" />
+                                <TextBlock Text="{x:Bind ViewModel.NewFileName, Mode=OneWay}" FontWeight="SemiBold" />
+                                <TextBlock Text="{x:Bind ViewModel.NewFileSize, Mode=OneWay}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</Page>

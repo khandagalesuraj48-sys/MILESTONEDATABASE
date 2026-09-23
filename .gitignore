@@ -1,0 +1,48 @@
+# Environment and Secrets (CRITICAL: NEVER COMMIT)
+.env
+.env.*
+!.env.example
+secrets.json
+*.pem
+*.key
+
+# Node.js / Backend
+backend/node_modules/
+backend/dist/
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Android / Gradle
+.gradle/
+android/.gradle/
+android/app/build/
+android/build/
+local.properties
+**/local.properties
+android/**/*.jks
+android/**/*.keystore
+*.apk
+*.aab
+
+# Windows / Visual Studio
+windows/**/bin/
+windows/**/obj/
+windows/**/.vs/
+windows/**/*.user
+windows/**/*.suo
+*.userprefs
+bin/
+obj/
+
+# Logs and Scratch Artifacts
+*.log
+test_*.txt
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+.idea/
+.vscode/

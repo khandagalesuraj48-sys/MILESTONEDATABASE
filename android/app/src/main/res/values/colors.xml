@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary brand color -->
+    <color name="primary">#1565C0</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="primary_container">#D1E4FF</color>
+    <color name="on_primary_container">#001D36</color>
+
+    <!-- Secondary -->
+    <color name="secondary">#535F70</color>
+    <color name="on_secondary">#FFFFFF</color>
+    <color name="secondary_container">#D7E3F7</color>
+    <color name="on_secondary_container">#101C2B</color>
+
+    <!-- Background -->
+    <color name="background">#FAFCFF</color>
+    <color name="on_background">#1A1C1E</color>
+    <color name="surface">#FAFCFF</color>
+    <color name="on_surface">#1A1C1E</color>
+
+    <!-- Status colors -->
+    <color name="status_selected">#388E3C</color>
+    <color name="status_selected_container">#C8E6C9</color>
+    <color name="status_rejected">#D32F2F</color>
+    <color name="status_rejected_container">#FFCDD2</color>
+    <color name="status_pending">#F57F17</color>
+    <color name="status_pending_container">#FFF9C4</color>
+    <color name="status_other">#616161</color>
+    <color name="status_other_container">#F5F5F5</color>
+
+    <!-- Error -->
+    <color name="error">#BA1A1A</color>
+    <color name="on_error">#FFFFFF</color>
+    <color name="error_container">#FFDAD6</color>
+    <color name="on_error_container">#410002</color>
+
+    <!-- Dark theme -->
+    <color name="primary_dark">#9ECAFF</color>
+    <color name="on_primary_dark">#003258</color>
+    <color name="background_dark">#1A1C1E</color>
+    <color name="on_background_dark">#E2E2E6</color>
+    <color name="surface_dark">#1A1C1E</color>
+    <color name="on_surface_dark">#E2E2E6</color>
+</resources>

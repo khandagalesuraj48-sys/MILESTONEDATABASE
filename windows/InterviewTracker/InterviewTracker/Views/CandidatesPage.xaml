@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="InterviewTracker.Views.CandidatesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:conv="using:InterviewTracker.Converters"
+    xmlns:models="using:InterviewTracker.Models"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Page.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+        <conv:StatusToBrushConverter x:Key="StatusToBrush" />
+        <conv:StringToVisibilityConverter x:Key="StringToVisibility" />
+    </Page.Resources>
+
+    <Grid Margin="24,16,24,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                <TextBlock Text="Candidates" Style="{ThemeResource TitleLargeTextBlockStyle}" />
+                <TextBlock x:Name="RecordCountText"
+                           Style="{ThemeResource CaptionTextBlockStyle}"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           Margin="0,4,0,0" />
+            </StackPanel>
+            <Button Grid.Column="1" Content="⟳  Refresh"
+                    Command="{x:Bind ViewModel.LoadCandidatesCommand}"
+                    VerticalAlignment="Center" />
+        </Grid>
+
+        <!-- Filters -->
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="160" />
+                    <ColumnDefinition Width="200" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBox Grid.Column="0"
+                         PlaceholderText="Search by name, ID, mobile, position, department..."
+                         Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         Margin="0,0,12,0" />
+
+                <ComboBox Grid.Column="1"
+                          Header="Status"
+                          ItemsSource="{x:Bind ViewModel.StatusOptions}"
+                          SelectedItem="{x:Bind ViewModel.SelectedStatus, Mode=TwoWay}"
+                          HorizontalAlignment="Stretch"
+                          Margin="0,0,12,0" />
+
+                <ComboBox Grid.Column="2"
+                          Header="Position"
+                          ItemsSource="{x:Bind ViewModel.PositionOptions, Mode=OneWay}"
+                          SelectedItem="{x:Bind ViewModel.SelectedPosition, Mode=TwoWay}"
+                          HorizontalAlignment="Stretch"
+                          Margin="0,0,12,0" />
+
+                <Button Grid.Column="3"
+                        Content="Clear Filters"
+                        Command="{x:Bind ViewModel.ClearFiltersCommand}"
+                        VerticalAlignment="Bottom" />
+            </Grid>
+        </Border>
+
+        <!-- Loading / Error -->
+        <StackPanel Grid.Row="2">
+            <ProgressBar IsIndeterminate="True"
+                         Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource BoolToVisibility}}"
+                         Margin="0,0,0,8" />
+            <InfoBar IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
+                     Severity="Error"
+                     Title="Error"
+                     Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                     Margin="0,0,0,8" />
+        </StackPanel>
+
+        <!-- Candidates ListView -->
+        <Border Grid.Row="3" Style="{StaticResource CardStyle}">
+            <ListView
+                ItemsSource="{x:Bind ViewModel.FilteredCandidates, Mode=OneWay}"
+                SelectionMode="None">
+
+                <ListView.Header>
+                    <Grid Padding="8,6" Background="{ThemeResource SystemFillColorSolidNeutralBackgroundBrush}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="60" />
+                            <ColumnDefinition Width="90" />
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="140" />
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="80" />
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="70" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="ID" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Grid.Column="1" Text="Date" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Grid.Column="2" Text="Name" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Grid.Column="3" Text="Mobile" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Grid.Column="4" Text="Position" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Grid.Column="5" Text="Dept" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Grid.Column="6" Text="Exp (Y)" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Grid.Column="7" Text="Status" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Grid.Column="8" Text="Recommendation" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Grid.Column="9" Text="Resume" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Grid.Column="10" Text="Actions" FontWeight="SemiBold" FontSize="12" />
+                    </Grid>
+                </ListView.Header>
+
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="models:Candidate">
+                        <Grid Padding="8,6" BorderThickness="0,0,0,1"
+                              BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="60" />
+                                <ColumnDefinition Width="90" />
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="100" />
+                                <ColumnDefinition Width="140" />
+                                <ColumnDefinition Width="100" />
+                                <ColumnDefinition Width="80" />
+                                <ColumnDefinition Width="100" />
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="70" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0" Text="{x:Bind InterviewId}" FontSize="12" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{x:Bind InterviewDate}" FontSize="11"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="{x:Bind CandidateName}" FontSize="12"
+                                       FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="3" Text="{x:Bind MobileNo}" FontSize="11" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="4" Text="{x:Bind PositionAppliedFor}" FontSize="11"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="5" Text="{x:Bind Department}" FontSize="11"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="6" Text="{x:Bind TotalExperienceYears}" FontSize="11"
+                                       VerticalAlignment="Center" HorizontalAlignment="Center" />
+
+                            <Border Grid.Column="7" CornerRadius="4" Padding="6,2"
+                                    HorizontalAlignment="Left" VerticalAlignment="Center"
+                                    Background="{x:Bind FinalStatus, Converter={StaticResource StatusToBrush}}">
+                                <TextBlock Text="{x:Bind FinalStatus}" FontSize="11" Foreground="White" />
+                            </Border>
+
+                            <TextBlock Grid.Column="8" Text="{x:Bind Recommendation}" FontSize="11"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+
+                            <HyperlinkButton Grid.Column="9"
+                                             Tag="{x:Bind ResumeUrl}"
+                                             Click="ResumeLink_Click"
+                                             Padding="4,0"
+                                             VerticalAlignment="Center"
+                                             Content="📄 View" FontSize="11" />
+
+                            <StackPanel Grid.Column="10" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                <Button Tag="{x:Bind InterviewId}" Click="CandViewButton_Click"
+                                        Style="{ThemeResource AccentButtonStyle}" Padding="6,3" FontSize="11">
+                                    <FontIcon Glyph="&#xE7B3;" FontSize="12" />
+                                </Button>
+                                <Button Tag="{x:Bind InterviewId}" Click="CandEditButton_Click"
+                                        Padding="6,3" FontSize="11">
+                                    <FontIcon Glyph="&#xE70F;" FontSize="12" />
+                                </Button>
+                                <Button Tag="{x:Bind InterviewId}" Click="CandWhatsAppButton_Click"
+                                        Padding="6,3" FontSize="11"
+                                        Background="#25D366" Foreground="White">
+                                    <TextBlock Text="WA" FontSize="11" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="Padding" Value="0" />
+                    </Style>
+                </ListView.ItemContainerStyle>
+            </ListView>
+        </Border>
+    </Grid>
+</Page>
+
